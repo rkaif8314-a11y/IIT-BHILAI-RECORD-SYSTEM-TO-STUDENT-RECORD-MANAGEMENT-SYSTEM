@@ -1,0 +1,587 @@
+import sqlite3
+import math
+import sys
+
+DB_NAME = "school.db"
+PASSWORD = "WELCOMEKAIF"
+
+
+# -------- UI --------
+
+def print_banner():
+    print("\033[95m" + "=" * 60 + "\033[0m")
+    print("\033[96m" + " " * 13 + "WELCOME TO IIT BHILAI" + " " * 13 + "\033[0m")
+    print("\033[95m" + "=" * 60 + "\033[0m")
+
+
+def authenticate():
+    print_banner()
+    print("\033[93mEnter password to access the system.\033[0m")
+    for _ in range(3):
+        pwd = input("Password: ")
+        if pwd == PASSWORD:
+            print("\033[92mAccess granted.\033[0m\n")
+            return True
+        print("\033[91mWrong password.\033[0m")
+    print("\033[91mToo many attempts. Exiting.\033[0m")
+    return False
+
+
+# -------- DB SETUP --------
+
+def get_connection():
+    return sqlite3.connect(DB_NAME)
+
+
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS students (
+        roll_no     TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        department  TEXT,
+        program     TEXT,
+        year        INTEGER,
+        section     TEXT,
+        age         INTEGER,
+        address     TEXT,
+        father_name TEXT,
+        mother_name TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS courses (
+        course_code TEXT PRIMARY KEY,
+        course_name TEXT,
+        instructor  TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS marks (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        roll_no     TEXT NOT NULL,
+        course_code TEXT NOT NULL,
+        marks       REAL NOT NULL,
+        FOREIGN KEY (roll_no) REFERENCES students(roll_no),
+        FOREIGN KEY (course_code) REFERENCES courses(course_code),
+        UNIQUE (roll_no, course_code)
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS attendance (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        roll_no TEXT NOT NULL,
+        date    TEXT NOT NULL,
+        status  TEXT NOT NULL,
+        FOREIGN KEY (roll_no) REFERENCES students(roll_no),
+        UNIQUE (roll_no, date)
+    );
+    """)
+
+    # reset courses list
+    cur.execute("DELETE FROM courses;")
+    default_courses = [
+        ("CSL100", "Computer Programming", "Gagan Raj Gupta"),
+        ("PHL102", "Physics", "Anjali Ma'am / Praveen Sir / Mahavir Sir"),
+        ("CYP102", "Chemistery lab", "Urvasi Ma'am"),
+        ("CYL100", "EVS", "Raghavender sir"),
+        ("MAL100", "Mathematics-I", "Avijit pal Sir"),
+        ("CYL101", "Applied chemistry", "Sanjib Sir / Suchetan Pal Sir")
+    ]
+
+    for code, name, instr in default_courses:
+        cur.execute("""
+        INSERT OR REPLACE INTO courses (course_code, course_name, instructor)
+        VALUES (?, ?, ?);
+        """, (code, name, instr))
+
+    conn.commit()
+    conn.close()
+
+
+# -------- STUDENTS --------
+
+def add_student():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nAdd new student")
+    roll_no = input("Roll No: ").strip()
+    name = input("Name: ").strip()
+    department = input("Department: ").strip()
+    program = input("Program: ").strip()
+    year_in = input("Year (1-4): ").strip()
+    section = input("Section: ").strip()
+    age = input("Age: ").strip()
+    address = input("Address: ").strip()
+    father_name = input("Father Name: ").strip()
+    mother_name = input("Mother Name: ").strip()
+
+    try:
+        age_val = int(age) if age else None
+    except ValueError:
+        print("\033[91mInvalid age. Using NULL.\033[0m")
+        age_val = None
+
+    try:
+        year_val = int(year_in) if year_in else None
+    except ValueError:
+        print("\033[91mInvalid year. Using NULL.\033[0m")
+        year_val = None
+
+    try:
+        cur.execute("""
+        INSERT INTO students
+        (roll_no, name, department, program, year, section, age, address, father_name, mother_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (roll_no, name, department, program, year_val, section, age_val, address, father_name, mother_name))
+        conn.commit()
+        print("\033[92mStudent added.\033[0m")
+    except sqlite3.IntegrityError:
+        print("\033[91mStudent with this roll already exists.\033[0m")
+
+    conn.close()
+
+
+def view_all_students():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nAll students")
+    cur.execute("""
+        SELECT roll_no, name, department, program, year, section, age
+        FROM students
+        ORDER BY CAST(roll_no AS INTEGER);
+    """)
+    rows = cur.fetchall()
+
+    if not rows:
+        print("No students found.")
+        conn.close()
+        return
+
+    print("{:<10} {:<20} {:<15} {:<8} {:<5} {:<8} {:<5}".format(
+        "Roll No", "Name", "Department", "Prog", "Year", "Section", "Age"
+    ))
+    print("-" * 80)
+    for r in rows:
+        print("{:<10} {:<20} {:<15} {:<8} {:<5} {:<8} {:<5}".format(
+            r[0],
+            r[1],
+            r[2] or "-",
+            (r[3] or "-")[:7],
+            r[4] if r[4] is not None else "-",
+            r[5] or "-",
+            r[6] if r[6] is not None else "-"
+        ))
+
+    conn.close()
+
+
+def search_student():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nSearch student")
+    term = input("Roll no or name (partial): ").strip()
+
+    cur.execute("""
+    SELECT roll_no, name, department, program, year, section, age,
+           address, father_name, mother_name
+    FROM students
+    WHERE roll_no LIKE ? OR name LIKE ?;
+    """, ('%' + term + '%', '%' + term + '%'))
+
+    rows = cur.fetchall()
+
+    if not rows:
+        print("No match.")
+        conn.close()
+        return
+
+    for r in rows:
+        print("\n-----------------------------")
+        print(f"Roll No     : {r[0]}")
+        print(f"Name        : {r[1]}")
+        print(f"Department  : {r[2]}")
+        print(f"Program     : {r[3]}")
+        print(f"Year        : {r[4]}")
+        print(f"Section     : {r[5]}")
+        print(f"Age         : {r[6]}")
+        print(f"Address     : {r[7]}")
+        print(f"Father Name : {r[8]}")
+        print(f"Mother Name : {r[9]}")
+        print("-----------------------------")
+
+    conn.close()
+
+
+def edit_student():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nEdit student")
+    roll_no = input("Roll no: ").strip()
+
+    cur.execute("""
+    SELECT roll_no, name, department, program, year, section, age,
+           address, father_name, mother_name
+    FROM students WHERE roll_no = ?;
+    """, (roll_no,))
+    row = cur.fetchone()
+
+    if not row:
+        print("\033[91mStudent not found.\033[0m")
+        conn.close()
+        return
+
+    print("Leave blank to keep existing.")
+    name = input(f"Name [{row[1]}]: ").strip() or row[1]
+    department = input(f"Department [{row[2]}]: ").strip() or row[2]
+    program = input(f"Program [{row[3]}]: ").strip() or row[3]
+    year_in = input(f"Year [{row[4]}]: ").strip()
+    section = input(f"Section [{row[5]}]: ").strip() or row[5]
+    age_in = input(f"Age [{row[6]}]: ").strip()
+    address = input(f"Address [{row[7]}]: ").strip() or row[7]
+    father_name = input(f"Father Name [{row[8]}]: ").strip() or row[8]
+    mother_name = input(f"Mother Name [{row[9]}]: ").strip() or row[9]
+
+    if year_in == "":
+        year_val = row[4]
+    else:
+        try:
+            year_val = int(year_in)
+        except ValueError:
+            print("\033[91mInvalid year. Keeping old.\033[0m")
+            year_val = row[4]
+
+    if age_in == "":
+        age_val = row[6]
+    else:
+        try:
+            age_val = int(age_in)
+        except ValueError:
+            print("\033[91mInvalid age. Keeping old.\033[0m")
+            age_val = row[6]
+
+    cur.execute("""
+    UPDATE students
+    SET name = ?, department = ?, program = ?, year = ?, section = ?,
+        age = ?, address = ?, father_name = ?, mother_name = ?
+    WHERE roll_no = ?;
+    """, (name, department, program, year_val, section,
+          age_val, address, father_name, mother_name, roll_no))
+
+    conn.commit()
+    conn.close()
+    print("\033[92mStudent updated.\033[0m")
+
+
+# -------- MARKS --------
+
+def get_all_courses():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT course_code, course_name, instructor FROM courses ORDER BY course_code;")
+    courses = cur.fetchall()
+    conn.close()
+    return courses
+
+
+def add_or_update_marks():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nAdd / update marks")
+    roll_no = input("Roll no: ").strip()
+
+    cur.execute("SELECT name FROM students WHERE roll_no = ?;", (roll_no,))
+    row = cur.fetchone()
+    if not row:
+        print("\033[91mStudent not found.\033[0m")
+        conn.close()
+        return
+
+    print(f"For: {row[0]} ({roll_no})")
+
+    courses = get_all_courses()
+    for code, name, instr in courses:
+        marks_in = input(f"Marks for {code} ({name}) [blank = skip]: ").strip()
+        if marks_in == "":
+            continue
+        try:
+            mval = float(marks_in)
+        except ValueError:
+            print("\033[91mInvalid marks. Skipped.\033[0m")
+            continue
+
+        cur.execute("""
+        INSERT INTO marks (roll_no, course_code, marks)
+        VALUES (?, ?, ?)
+        ON CONFLICT(roll_no, course_code)
+        DO UPDATE SET marks = excluded.marks;
+        """, (roll_no, code, mval))
+
+    conn.commit()
+    conn.close()
+    print("\033[92mMarks saved.\033[0m")
+
+
+def absolute_grade(marks):
+    if marks >= 90:
+        return "A+"
+    elif marks >= 80:
+        return "A"
+    elif marks >= 70:
+        return "B"
+    elif marks >= 60:
+        return "C"
+    elif marks >= 50:
+        return "D"
+    return "F"
+
+
+def relative_grade(course_code, student_marks):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT marks FROM marks WHERE course_code = ?;", (course_code,))
+    all_rows = cur.fetchall()
+    conn.close()
+
+    all_marks = [r[0] for r in all_rows if r[0] is not None]
+
+    # If not enough data, use absolute grading
+    if len(all_marks) < 2:
+        return absolute_grade(student_marks)
+
+    mean = sum(all_marks) / len(all_marks)
+    variance = sum((m - mean) ** 2 for m in all_marks) / len(all_marks)
+    std = math.sqrt(variance)
+
+    # If no variation, use absolute
+    if std == 0:
+        return absolute_grade(student_marks)
+
+    # friendlier relative bands
+    if student_marks >= mean + std:
+        rel = "A+"
+    elif student_marks >= mean + 0.5 * std:
+        rel = "A"
+    elif student_marks >= mean:
+        rel = "B"
+    elif student_marks >= mean - 0.5 * std:
+        rel = "C"
+    else:
+        rel = "D"
+
+    # Never give worse grade than absolute
+    abs_g = absolute_grade(student_marks)
+    order = ["F", "D", "C", "B", "A", "A+"]
+
+    return order[max(order.index(rel), order.index(abs_g))]
+
+
+def generate_student_report():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nStudent report")
+    roll_no = input("Roll no: ").strip()
+
+    cur.execute("""
+    SELECT roll_no, name, department, program, year, section, age,
+           address, father_name, mother_name
+    FROM students WHERE roll_no = ?;
+    """, (roll_no,))
+    s = cur.fetchone()
+    if not s:
+        print("\033[91mStudent not found.\033[0m")
+        conn.close()
+        return
+
+    cur.execute("""
+    SELECT m.course_code, c.course_name, c.instructor, m.marks
+    FROM marks m
+    JOIN courses c ON m.course_code = c.course_code
+    WHERE m.roll_no = ?
+    ORDER BY m.course_code;
+    """, (roll_no,))
+    marks_rows = cur.fetchall()
+
+    cur.execute("""
+    SELECT date, status FROM attendance
+    WHERE roll_no = ?
+    ORDER BY date;
+    """, (roll_no,))
+    att_rows = cur.fetchall()
+
+    conn.close()
+
+    print("\n" + "=" * 60)
+    print("                STUDENT REPORT")
+    print("=" * 60)
+    print(f"Roll No     : {s[0]}")
+    print(f"Name        : {s[1]}")
+    print(f"Department  : {s[2]}")
+    print(f"Program     : {s[3]}")
+    print(f"Year        : {s[4]}")
+    print(f"Section     : {s[5]}")
+    print(f"Age         : {s[6]}")
+    print(f"Address     : {s[7]}")
+    print(f"Father Name : {s[8]}")
+    print(f"Mother Name : {s[9]}")
+    print("-" * 60)
+
+    print("\nMarks & Grades:")
+    if not marks_rows:
+        print("No marks data.")
+    else:
+        print("{:<8} {:<25} {:<20} {:<7} {:<8}".format(
+            "Code", "Course Name", "Instructor", "Marks", "Grade"))
+        print("-" * 80)
+        for code, cname, instr, mk in marks_rows:
+            grade = relative_grade(code, mk)
+            print("{:<8} {:<25} {:<20} {:<7} {:<8}".format(
+                code, cname[:24], instr[:19], mk, grade
+            ))
+
+    print("\nAttendance:")
+    if not att_rows:
+        print("No attendance data.")
+    else:
+        total_present = sum(1 for d, st in att_rows if st.upper() == "P")
+        total_records = len(att_rows)
+        print(f"Present days : {total_present}")
+        print(f"Total records: {total_records}")
+        print("Dates present:")
+        for d, st in att_rows:
+            if st.upper() == "P":
+                print(f"  - {d}")
+
+    print("=" * 60 + "\n")
+
+
+# -------- ATTENDANCE --------
+
+def mark_attendance():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nMark attendance (P)")
+    roll_no = input("Roll no: ").strip()
+    date = input("Date (YYYY-MM-DD): ").strip()
+
+    cur.execute("SELECT name FROM students WHERE roll_no = ?;", (roll_no,))
+    row = cur.fetchone()
+    if not row:
+        print("\033[91mStudent not found.\033[0m")
+        conn.close()
+        return
+
+    try:
+        cur.execute("""
+        INSERT INTO attendance (roll_no, date, status)
+        VALUES (?, ?, 'P')
+        ON CONFLICT(roll_no, date)
+        DO UPDATE SET status = 'P';
+        """, (roll_no, date))
+        conn.commit()
+        print(f"\033[92mMarked PRESENT for {row[0]} on {date}.\033[0m")
+    except Exception as e:
+        print("\033[91mError while marking attendance:\033[0m", e)
+
+    conn.close()
+
+
+def view_attendance():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    print("\nView attendance")
+    roll_no = input("Roll no: ").strip()
+
+    cur.execute("SELECT name FROM students WHERE roll_no = ?;", (roll_no,))
+    s = cur.fetchone()
+    if not s:
+        print("\033[91mStudent not found.\033[0m")
+        conn.close()
+        return
+
+    cur.execute("""
+    SELECT date, status FROM attendance
+    WHERE roll_no = ?
+    ORDER BY date;
+    """, (roll_no,))
+    rows = cur.fetchall()
+
+    if not rows:
+        print("No attendance records.")
+        conn.close()
+        return
+
+    print(f"Attendance for {s[0]} ({roll_no}):")
+    print("{:<12} {:<8}".format("Date", "Status"))
+    print("-" * 25)
+    for d, st in rows:
+        print("{:<12} {:<8}".format(d, st))
+
+    conn.close()
+
+
+# -------- MENU --------
+
+def show_menu():
+    print("\n===== IIT BHILAI RECORD SYSTEM =====")
+    print("1. Add student")
+    print("2. View all students")
+    print("3. Edit student")
+    print("4. Add / update marks(Subject-wise)")
+    print("5. Student report(with Relative grading)")
+    print("6. Search student(by Roll No or Name)")
+    print("7. Mark attendance(present with date)")
+    print("8. View attendance of a student")
+    print("9. Exit")
+    print("====================================")
+
+
+def main():
+    if not authenticate():
+        sys.exit(0)
+
+    init_db()
+
+    while True:
+        show_menu()
+        choice = input("Choice: ").strip()
+
+        if choice == "1":
+            add_student()
+        elif choice == "2":
+            view_all_students()
+        elif choice == "3":
+            edit_student()
+        elif choice == "4":
+            add_or_update_marks()
+        elif choice == "5":
+            generate_student_report()
+        elif choice == "6":
+            search_student()
+        elif choice == "7":
+            mark_attendance()
+        elif choice == "8":
+            view_attendance()
+        elif choice == "9":
+            print("Goodbye.")
+            break
+        else:
+            print("\033[91mInvalid choice.\033[0m")
+
+
+if __name__ == "__main__":
+    main()
