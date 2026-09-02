@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data; }
+    function role(r) { return signedIn() && profile().role == r; }
+    match /profiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || role('admin'));
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && (request.auth.uid == uid || role('admin'));
+      allow delete: if role('admin');
+    }
+    match /courses/{id} { allow read: if signedIn(); allow write: if role('admin') || role('faculty'); }
+    match /enrollments/{id} { allow read: if signedIn(); allow write: if role('admin') || role('faculty'); }
+    match /attendanceSessions/{id} { allow read: if signedIn(); allow write: if role('admin') || role('faculty'); }
+    match /attendanceRecords/{id} { allow read: if signedIn() && (resource.data.studentId == request.auth.uid || role('admin') || role('faculty')); allow write: if role('admin') || role('faculty'); }
+    match /marks/{id} { allow read: if signedIn() && (resource.data.studentId == request.auth.uid || role('admin') || role('faculty')); allow write: if role('admin') || role('faculty'); }
+  }
+}
