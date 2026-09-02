@@ -146,7 +146,15 @@ export default function Login() {
           <div className="logo">A</div>
           <div>ASRS<small>Secure Academic Records</small></div>
         </Link>
-        <Link href="/register" className="button">Create student account</Link>
+        {expectedRole === "student" ? (
+          <Link href="/register" className="button">Create a new student account</Link>
+        ) : (
+          <span className="auth-nav-note">
+            {expectedRole === "faculty"
+              ? "Faculty accounts are provisioned by ASRS"
+              : "Administrator accounts are provisioned by ASRS"}
+          </span>
+        )}
       </nav>
 
       <section className="auth-shell">
