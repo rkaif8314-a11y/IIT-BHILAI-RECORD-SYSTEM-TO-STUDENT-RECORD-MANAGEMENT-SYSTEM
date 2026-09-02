@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 import { ArrowRight, ShieldCheck } from "lucide-react";
@@ -73,6 +73,34 @@ export default function Login() {
     return () => unsubscribe?.();
   }, []);
 
+  async function resetPassword() {
+    const targetEmail = email.trim().toLowerCase();
+
+    if (!targetEmail) {
+      setMessage("Enter your email address first, then choose Forgot password.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("Sending password reset email…");
+
+    try {
+      await sendPasswordResetEmail(getFirebaseAuth(), targetEmail);
+      setMessage("Password reset email sent. Check your inbox and follow the reset link.");
+    } catch (error) {
+      const code = errorCode(error);
+      setMessage(
+        code.includes("user-not-found")
+          ? "No ASRS account was found for this email."
+          : code.includes("invalid-email")
+            ? "Enter a valid email address."
+            : errorMessage(error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -118,6 +146,15 @@ export default function Login() {
             <label>Email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" required /></label>
             <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" required /></label>
             <button className="button primary wide" disabled={busy}>{busy ? "Signing in…" : "Sign in"} <ArrowRight size={17}/></button>
+            <button
+              type="button"
+              className="button wide"
+              disabled={busy}
+              onClick={resetPassword}
+              style={{ marginTop: 10 }}
+            >
+              Forgot password?
+            </button>
           </form>
           {message && <div className="status">{message}</div>}
           <div className="auth-note">Students can create an account. Faculty and administrator accounts are provisioned by an administrator.</div>
