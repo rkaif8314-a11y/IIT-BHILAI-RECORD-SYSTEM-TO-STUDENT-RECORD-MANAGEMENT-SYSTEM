@@ -2,17 +2,20 @@ import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
-// Firebase web configuration.
-// NEXT_PUBLIC_* environment variables can override these values in Vercel.
-// Firebase Web API keys are intended to identify the web app; access is
-// controlled by Firebase Authentication and Firestore Security Rules.
+/**
+ * ASRS Firebase web client.
+ * These are Firebase Web App identifiers, not server credentials.
+ * Keeping the configuration here makes the deployment independent of
+ * Vercel/Netlify environment-variable configuration.
+ */
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDb3YeW_zrtHnjydx8E4wd0gZdAWv7IXA4",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "asrs-1e171.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "asrs-1e171",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "asrs-1e171.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1037562093768",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1037562093768:web:7f3b48701236a2bb7045fd",
+  apiKey: "AIzaSyDb3YeW_zrtHnjydx8E4wd0gZdAWv7IXA4",
+  authDomain: "asrs-1e171.firebaseapp.com",
+  projectId: "asrs-1e171",
+  storageBucket: "asrs-1e171.firebasestorage.app",
+  messagingSenderId: "1037562093768",
+  appId: "1:1037562093768:web:7f3b48701236a2bb7045fd",
+  measurementId: "G-Q8YTC60G61",
 };
 
 export function getFirebaseApp(): FirebaseApp {
@@ -21,7 +24,7 @@ export function getFirebaseApp(): FirebaseApp {
   }
 
   const apps = getApps();
-  return apps.length ? apps[0] : initializeApp(firebaseConfig);
+  return apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
 }
 
 export function getFirebaseAuth(): Auth {
