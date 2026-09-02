@@ -1,41 +1,68 @@
 "use client";
+
 import { useState } from "react";
 import { ShieldCheck, Users, GraduationCap, BookOpen, Settings } from "lucide-react";
 
+type Section = "Overview" | "Students" | "Faculty" | "Courses" | "Controls";
+
+const sections: Section[] = ["Overview", "Students", "Faculty", "Courses", "Controls"];
+
+function SectionIcon({ section }: { section: Section }) {
+  if (section === "Overview") return <ShieldCheck size={16} aria-hidden="true" />;
+  if (section === "Students") return <Users size={16} aria-hidden="true" />;
+  if (section === "Faculty") return <GraduationCap size={16} aria-hidden="true" />;
+  if (section === "Courses") return <BookOpen size={16} aria-hidden="true" />;
+  return <Settings size={16} aria-hidden="true" />;
+}
+
 export default function AdminPortal() {
-  const [section, setSection] = useState("Overview");
-  const button = (label: string, Icon: typeof ShieldCheck) => (
-    <button key={label} onClick={() => setSection(label)} className="button" style={{ cursor: "pointer" }}>
-      <Icon size={16} /> {label}
-    </button>
-  );
+  const [section, setSection] = useState<Section>("Overview");
 
   return (
     <main className="page">
       <nav className="nav">
         <div className="brand">
-          <a href="/" style={{ color: "inherit", textDecoration: "none" }}>←</a>
+          <a href="/" style={{ color: "inherit", textDecoration: "none" }} aria-label="Back to ASRS">←</a>
           <div className="logo">A</div>
           <div>ASRS<small>Admin Portal</small></div>
         </div>
         <div className="navtag">Administrator • System Control</div>
       </nav>
+
       <section style={{ maxWidth: 1200, margin: "0 auto", padding: "55px 6vw" }}>
         <span className="eyebrow">Admin Portal</span>
-        <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "18px 0 10px", letterSpacing: "-.04em" }}>Control the system.</h1>
-        <p style={{ color: "#9db0c7", fontSize: 17 }}>Manage academic entities and keep ASRS organized.</p>
+        <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "18px 0 10px", letterSpacing: "-.04em" }}>
+          Control the system.
+        </h1>
+        <p style={{ color: "#9db0c7", fontSize: 17 }}>
+          Manage academic entities and keep ASRS organized.
+        </p>
+
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
-          {button("Overview", ShieldCheck)}
-          {button("Students", Users)}
-          {button("Faculty", GraduationCap)}
-          {button("Courses", BookOpen)}
-          {button("Controls", Settings)}
+          {sections.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setSection(item)}
+              className="button"
+              style={{ cursor: "pointer" }}
+              aria-pressed={section === item}
+            >
+              <SectionIcon section={item} /> {item}
+            </button>
+          ))}
         </div>
+
         <div className="panel" style={{ marginTop: 18 }}>
           <strong>{section}</strong>
-          <p style={{ color: "#9db0c7", lineHeight: 1.7 }}>This ASRS administration area is ready for the production database and role-based authentication. Data-management actions will be connected in the next implementation stages.</p>
+          <p style={{ color: "#9db0c7", lineHeight: 1.7 }}>
+            This ASRS administration area is ready for the production database and role-based authentication.
+          </p>
         </div>
-        <div className="actions"><a className="button" href="/">Back to ASRS</a></div>
+
+        <div className="actions">
+          <a className="button" href="/">Back to ASRS</a>
+        </div>
       </section>
     </main>
   );
