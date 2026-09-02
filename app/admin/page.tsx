@@ -1,18 +1,14 @@
 "use client";
 import { useState } from "react";
-import { ShieldCheck, Users, GraduationCap, BookOpen, Settings, type LucideIcon } from "lucide-react";
-
-type AdminItem = { label: string; Icon: LucideIcon };
+import { ShieldCheck, Users, GraduationCap, BookOpen, Settings } from "lucide-react";
 
 export default function AdminPortal() {
   const [section, setSection] = useState("Overview");
-  const items: AdminItem[] = [
-    { label: "Overview", Icon: ShieldCheck },
-    { label: "Students", Icon: Users },
-    { label: "Faculty", Icon: GraduationCap },
-    { label: "Courses", Icon: BookOpen },
-    { label: "Controls", Icon: Settings },
-  ];
+  const button = (label: string, Icon: typeof ShieldCheck) => (
+    <button key={label} onClick={() => setSection(label)} className="button" style={{ cursor: "pointer" }}>
+      <Icon size={16} /> {label}
+    </button>
+  );
 
   return (
     <main className="page">
@@ -26,23 +22,18 @@ export default function AdminPortal() {
       </nav>
       <section style={{ maxWidth: 1200, margin: "0 auto", padding: "55px 6vw" }}>
         <span className="eyebrow">Admin Portal</span>
-        <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "18px 0 10px", letterSpacing: "-.04em" }}>
-          Control the system.
-        </h1>
+        <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "18px 0 10px", letterSpacing: "-.04em" }}>Control the system.</h1>
         <p style={{ color: "#9db0c7", fontSize: 17 }}>Manage academic entities and keep ASRS organized.</p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
-          {items.map(({ label, Icon }) => (
-            <button key={label} onClick={() => setSection(label)} className="button" style={{ cursor: "pointer" }}>
-              <Icon size={16} /> {label}
-            </button>
-          ))}
+          {button("Overview", ShieldCheck)}
+          {button("Students", Users)}
+          {button("Faculty", GraduationCap)}
+          {button("Courses", BookOpen)}
+          {button("Controls", Settings)}
         </div>
         <div className="panel" style={{ marginTop: 18 }}>
           <strong>{section}</strong>
-          <p style={{ color: "#9db0c7", lineHeight: 1.7 }}>
-            This ASRS administration area is ready for the production database and role-based authentication.
-            Data-management actions will be connected in the next implementation stages.
-          </p>
+          <p style={{ color: "#9db0c7", lineHeight: 1.7 }}>This ASRS administration area is ready for the production database and role-based authentication. Data-management actions will be connected in the next implementation stages.</p>
         </div>
         <div className="actions"><a className="button" href="/">Back to ASRS</a></div>
       </section>
