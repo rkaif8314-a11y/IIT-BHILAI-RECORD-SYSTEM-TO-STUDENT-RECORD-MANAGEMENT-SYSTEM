@@ -17,9 +17,9 @@ type Portal = {
 };
 
 const portals: Portal[] = [
-  { title: "Student Portal", role: "Students", desc: "Attendance, marks & profile", icon: "student", loginRole: "student" },
-  { title: "Faculty Portal", role: "Faculty", desc: "Classes & attendance", icon: "faculty", loginRole: "faculty" },
-  { title: "Admin Portal", role: "Administrator", desc: "System management", icon: "admin", loginRole: "admin" }
+  { title: "Student Portal", role: "Students", desc: "Create an account or sign in", icon: "student", loginRole: "student" },
+  { title: "Faculty Portal", role: "Faculty", desc: "ASRS-provisioned accounts only", icon: "faculty", loginRole: "faculty" },
+  { title: "Admin Portal", role: "Administrator", desc: "ASRS-provisioned accounts only", icon: "admin", loginRole: "admin" }
 ];
 
 function PortalIcon({ icon }: { icon: Portal["icon"] }) {
@@ -29,10 +29,10 @@ function PortalIcon({ icon }: { icon: Portal["icon"] }) {
 }
 
 const systemCards = [
-  { title: "Students", desc: "Central student records", icon: <Users size={20} />, href: "/login" },
-  { title: "Courses", desc: "Subject management", icon: <BookOpen size={20} />, href: "/login" },
-  { title: "Attendance", desc: "Track & analyze", icon: <BarChart3 size={20} />, href: "/login" },
-  { title: "Secure", desc: "Role-based access", icon: <ShieldCheck size={20} />, href: "/login" }
+  { title: "Students", desc: "Central student records", icon: <Users size={20} />, href: "/login?role=student" },
+  { title: "Courses", desc: "Subject management", icon: <BookOpen size={20} />, href: "/login?role=faculty" },
+  { title: "Attendance", desc: "Track & analyze", icon: <BarChart3 size={20} />, href: "/login?role=faculty" },
+  { title: "Secure", desc: "Role-based access", icon: <ShieldCheck size={20} />, href: "/login?role=student" }
 ];
 
 export default function Home() {
@@ -45,7 +45,7 @@ export default function Home() {
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className="navtag">IIT Bhilai • Academic Records</div>
-          <Link href="/login" className="button" style={{ padding: "9px 14px" }}>
+          <Link href="/login?role=student" className="button" style={{ padding: "9px 14px" }}>
             <LogIn size={15} /> Sign in
           </Link>
         </div>
@@ -60,7 +60,7 @@ export default function Home() {
             and student information — built for students, faculty and administrators.
           </p>
           <div className="actions">
-            <Link className="button primary" href="/login">Enter ASRS <ArrowRight size={16} /></Link>
+            <Link className="button primary" href="/login?role=student">Enter ASRS <ArrowRight size={16} /></Link>
             <Link className="button" href="#features">System features</Link>
           </div>
         </div>
@@ -69,13 +69,9 @@ export default function Home() {
           <div className="panelhead"><strong>ASRS System</strong><span className="dot" /></div>
           <div className="stats">
             {systemCards.map(card => (
-              <Link
-                href={card.href}
-                key={card.title}
-                className="stat"
+              <Link href={card.href} key={card.title} className="stat"
                 style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}
-                aria-label={card.title + " - sign in"}
-              >
+                aria-label={card.title + " - sign in"}>
                 {card.icon}<strong>{card.title}</strong><span>{card.desc}</span>
               </Link>
             ))}
@@ -89,7 +85,7 @@ export default function Home() {
           Choose your portal
         </h2>
         <p style={{ color: "#9db0c7", marginBottom: 24 }}>
-          Sign in with your ASRS account. Your role automatically determines the portal you can access.
+          Students can create their own accounts. Faculty and Administrator accounts are provisioned by ASRS.
         </p>
         <div className="features" style={{ padding: 0, gridTemplateColumns: "repeat(3,1fr)" }}>
           {portals.map((portal) => (
@@ -108,13 +104,9 @@ export default function Home() {
 
       <section id="features" className="features">
         {features.map(([title, text]) => (
-          <Link
-            href="/login"
-            className="feature"
-            key={title}
+          <Link href="/login?role=student" className="feature" key={title}
             style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}
-            aria-label={title + " - sign in"}
-          >
+            aria-label={title + " - sign in"}>
             <b>{title}</b><span>{text}</span>
             <span style={{ display: "inline-flex", marginTop: 14, color: "#9dc5ff", fontWeight: 700 }}>
               Open <ArrowRight size={15} style={{ marginLeft: 6 }} />
