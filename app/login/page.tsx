@@ -32,6 +32,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expectedRole, setExpectedRole] = useState<"student" | "faculty" | "admin">("student");
 
   async function routeUser(uid: string, userEmail: string | null) {
     const db = getFirebaseDb();
@@ -39,22 +40,34 @@ export default function Login() {
     const snap = await getDoc(ref);
 
     if (!snap.exists()) {
-      await setDoc(ref, {
-        fullName: userEmail?.split("@")[0] || "Student",
-        rollNo: "",
-        department: "",
-        role: "student",
-        email: userEmail || "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      setMessage("This account has no ASRS profile yet. Faculty and administrator accounts must be provisioned by an administrator.");
+      return;
     }
 
-    const profile = (await getDoc(ref)).data() || {};
-    window.location.replace(destination(profile.role));
+    const profile = snap.data() || {};
+    const actualRole = profile.role;
+
+    if (!["student", "faculty", "admin"].includes(actualRole)) {
+      setMessage("Your ASRS account does not have a valid role. Ask an administrator to provision it.");
+      return;
+    }
+
+    if (actualRole !== expectedRole) {
+      const names = { student: "Student", faculty: "Faculty", admin: "Administrator" };
+      setMessage(`This account is registered as ${names[actualRole as "student" | "faculty" | "admin"]}. Select "${names[actualRole as "student" | "faculty" | "admin"]}" and sign in again.`);
+      await getFirebaseAuth().signOut();
+      return;
+    }
+
+    window.location.replace(destination(actualRole));
   }
 
   useEffect(() => {
+    const role = new URLSearchParams(window.location.search).get("role");
+    if (role === "student" || role === "faculty" || role === "admin") {
+      setExpectedRole(role);
+    }
+
     let unsubscribe: (() => void) | undefined;
     try {
       const auth = getFirebaseAuth();
@@ -141,7 +154,27 @@ export default function Login() {
           <div className="auth-icon"><ShieldCheck size={26}/></div>
           <span className="eyebrow">Firebase Authentication</span>
           <h1>Welcome back.</h1>
-          <p>Sign in to open your role-based ASRS workspace.</p>
+          <p>Sign in with your provisioned ASRS account. Students can register; faculty and administrators cannot create accounts from this page.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, margin: "20px 0" }}>
+            {([
+              ["student", "Student"],
+              ["faculty", "Faculty"],
+              ["admin", "Administrator"],
+            ] as const).map(([role, label]) => (
+              <button
+                key={role}
+                type="button"
+                className={"button " + (expectedRole === role ? "active" : "")}
+                onClick={() => { setExpectedRole(role); setMessage(""); }}
+                disabled={busy}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="auth-note" style={{ marginBottom: 16 }}>
+            Selected role: <strong>{expectedRole === "admin" ? "Administrator" : expectedRole === "faculty" ? "Faculty" : "Student"}</strong>
+          </div>
           <form onSubmit={submit}>
             <label>Email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" required /></label>
             <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" required /></label>
@@ -157,7 +190,7 @@ export default function Login() {
             </button>
           </form>
           {message && <div className="status">{message}</div>}
-          <div className="auth-note">Students can create an account. Faculty and administrator accounts are provisioned by an administrator.</div>
+          <div className="auth-note">Students can create an account. Faculty and Administrator accounts are created/provisioned separately by an ASRS administrator, then those users sign in here with their assigned credentials.</div>
         </div>
       </section>
     </main>
