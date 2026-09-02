@@ -2,10 +2,20 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+
+function destination(role: unknown) {
+  return role === "admin" ? "/admin" : role === "faculty" ? "/faculty" : "/student";
+}
+
+function errorCode(error: unknown) {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as { code: string }).code)
+    : "";
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,34 +23,76 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  async function routeUser(uid: string, userEmail: string | null) {
+    const db = getFirebaseDb();
+    const ref = doc(db, "profiles", uid);
+    const snap = await getDoc(ref);
+
+    // Auth accounts created before the Firestore profile existed are repaired
+    // automatically on first login.
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        fullName: userEmail?.split("@")[0] || "Student",
+        rollNo: "",
+        department: "",
+        role: "student",
+        email: userEmail || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      window.location.replace("/student");
+      return;
+    }
+
+    window.location.replace(destination(snap.data().role));
+  }
+
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     try {
       const auth = getFirebaseAuth();
-      return onAuthStateChanged(auth, async (user) => {
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (!user) return;
         try {
-          const snap = await getDoc(doc(getFirebaseDb(), "profiles", user.uid));
-          const role = snap.exists() ? snap.data().role : "student";
-          window.location.replace(role === "admin" ? "/admin" : role === "faculty" ? "/faculty" : "/student");
-        } catch {}
+          await routeUser(user.uid, user.email);
+        } catch {
+          // Stay on login so a Firestore/rules problem can be shown after
+          // the user submits the form instead of causing a blank redirect.
+        }
       });
-    } catch {}
+    } catch {
+      setMessage("Firebase could not be initialized. Check the Firebase configuration.");
+    }
+
+    return () => unsubscribe?.();
   }, []);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setMessage("Authenticating securely…");
+
     try {
-      const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
-      const snap = await getDoc(doc(getFirebaseDb(), "profiles", credential.user.uid));
-      const role = snap.exists() ? snap.data().role : "student";
-      window.location.replace(role === "admin" ? "/admin" : role === "faculty" ? "/faculty" : "/student");
+      const credential = await signInWithEmailAndPassword(
+        getFirebaseAuth(),
+        email.trim().toLowerCase(),
+        password
+      );
+      await routeUser(credential.user.uid, credential.user.email);
     } catch (error) {
-      const code = error && typeof error === "object" && "code" in error ? String((error as {code:string}).code) : "";
-      setMessage(code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")
-        ? "Email or password is incorrect."
-        : error instanceof Error ? error.message : "Unable to sign in.");
+      const code = errorCode(error);
+      setMessage(
+        code.includes("invalid-credential") ||
+        code.includes("wrong-password") ||
+        code.includes("user-not-found")
+          ? "Email or password is incorrect."
+          : code.includes("permission-denied")
+            ? "Login worked, but Firestore denied the profile read/write. Check the ASRS Firestore rules."
+            : error instanceof Error
+              ? error.message
+              : "Unable to sign in."
+      );
       setBusy(false);
     }
   }
@@ -48,11 +100,13 @@ export default function Login() {
   return (
     <main className="page">
       <nav className="nav">
-        <Link href="/" className="brand" style={{color:"inherit",textDecoration:"none"}}>
-          <div className="logo">A</div><div>ASRS<small>Secure Academic Records</small></div>
+        <Link href="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}>
+          <div className="logo">A</div>
+          <div>ASRS<small>Secure Academic Records</small></div>
         </Link>
         <Link href="/register" className="button">Create student account</Link>
       </nav>
+
       <section className="auth-shell">
         <div className="auth-card">
           <div className="auth-icon"><ShieldCheck size={26}/></div>
