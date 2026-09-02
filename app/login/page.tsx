@@ -17,6 +17,16 @@ function errorCode(error: unknown) {
     : "";
 }
 
+function errorMessage(error: unknown) {
+  const code = errorCode(error);
+  if (code.includes("permission-denied")) {
+    return "Firestore denied access. The ASRS Firestore rules must be published in Firebase Console.";
+  }
+  if (code.includes("unavailable")) return "Firestore is temporarily unavailable. Try again.";
+  if (code.includes("invalid-api-key")) return "Firebase API configuration is invalid.";
+  return error instanceof Error ? error.message : "Unable to open your profile.";
+}
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,8 +38,6 @@ export default function Login() {
     const ref = doc(db, "profiles", uid);
     const snap = await getDoc(ref);
 
-    // Auth accounts created before the Firestore profile existed are repaired
-    // automatically on first login.
     if (!snap.exists()) {
       await setDoc(ref, {
         fullName: userEmail?.split("@")[0] || "Student",
@@ -39,39 +47,36 @@ export default function Login() {
         email: userEmail || "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }, { merge: true });
-      window.location.replace("/student");
-      return;
+      });
     }
 
-    window.location.replace(destination(snap.data().role));
+    const profile = (await getDoc(ref)).data() || {};
+    window.location.replace(destination(profile.role));
   }
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-
     try {
       const auth = getFirebaseAuth();
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (!user) return;
         try {
           await routeUser(user.uid, user.email);
-        } catch {
-          // Stay on login so a Firestore/rules problem can be shown after
-          // the user submits the form instead of causing a blank redirect.
+        } catch (error) {
+          setMessage(errorMessage(error));
+          setBusy(false);
         }
       });
-    } catch {
-      setMessage("Firebase could not be initialized. Check the Firebase configuration.");
+    } catch (error) {
+      setMessage(errorMessage(error));
     }
-
     return () => unsubscribe?.();
   }, []);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    setMessage("Authenticating securely…");
+    setMessage("Signing in and loading your ASRS profile…");
 
     try {
       const credential = await signInWithEmailAndPassword(
@@ -87,11 +92,7 @@ export default function Login() {
         code.includes("wrong-password") ||
         code.includes("user-not-found")
           ? "Email or password is incorrect."
-          : code.includes("permission-denied")
-            ? "Login worked, but Firestore denied the profile read/write. Check the ASRS Firestore rules."
-            : error instanceof Error
-              ? error.message
-              : "Unable to sign in."
+          : errorMessage(error)
       );
       setBusy(false);
     }
