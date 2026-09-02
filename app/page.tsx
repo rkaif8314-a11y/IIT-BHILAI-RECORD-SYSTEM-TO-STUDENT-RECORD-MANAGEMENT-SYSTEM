@@ -27,6 +27,13 @@ function PortalIcon({ icon }: { icon: Portal["icon"] }) {
   return <ShieldCheck size={24} />;
 }
 
+const systemCards = [
+  { title: "Students", desc: "Central student records", icon: <Users size={20} />, href: "/login" },
+  { title: "Courses", desc: "Subject management", icon: <BookOpen size={20} />, href: "/login" },
+  { title: "Attendance", desc: "Track & analyze", icon: <BarChart3 size={20} />, href: "/login" },
+  { title: "Secure", desc: "Role-based access", icon: <ShieldCheck size={20} />, href: "/login" }
+];
+
 export default function Home() {
   return (
     <main className="page">
@@ -60,10 +67,17 @@ export default function Home() {
         <div className="panel">
           <div className="panelhead"><strong>ASRS System</strong><span className="dot" /></div>
           <div className="stats">
-            <div className="stat"><Users size={20} /><strong>Students</strong><span>Central records</span></div>
-            <div className="stat"><BookOpen size={20} /><strong>Courses</strong><span>Subject management</span></div>
-            <div className="stat"><BarChart3 size={20} /><strong>Attendance</strong><span>Track & analyze</span></div>
-            <div className="stat"><ShieldCheck size={20} /><strong>Secure</strong><span>Role-based access</span></div>
+            {systemCards.map(card => (
+              <Link
+                href={card.href}
+                key={card.title}
+                className="stat"
+                style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}
+                aria-label={card.title + " - sign in"}
+              >
+                {card.icon}<strong>{card.title}</strong><span>{card.desc}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
@@ -93,9 +107,18 @@ export default function Home() {
 
       <section id="features" className="features">
         {features.map(([title, text]) => (
-          <article className="feature" key={title}>
+          <Link
+            href="/login"
+            className="feature"
+            key={title}
+            style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}
+            aria-label={title + " - sign in"}
+          >
             <b>{title}</b><span>{text}</span>
-          </article>
+            <span style={{ display: "inline-flex", marginTop: 14, color: "#9dc5ff", fontWeight: 700 }}>
+              Open <ArrowRight size={15} style={{ marginLeft: 6 }} />
+            </span>
+          </Link>
         ))}
       </section>
 
