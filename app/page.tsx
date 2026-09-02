@@ -8,11 +8,24 @@ const features = [
   ["Live Records", "A single platform for organized academic records."]
 ];
 
-const portals = [
-  ["Student Portal", "Students", "Attendance, marks & profile", "/login", Users],
-  ["Faculty Portal", "Faculty", "Classes & attendance", "/login", GraduationCap],
-  ["Admin Portal", "Administrator", "System management", "/login", ShieldCheck]
+type Portal = {
+  title: string;
+  role: string;
+  desc: string;
+  icon: "student" | "faculty" | "admin";
+};
+
+const portals: Portal[] = [
+  { title: "Student Portal", role: "Students", desc: "Attendance, marks & profile", icon: "student" },
+  { title: "Faculty Portal", role: "Faculty", desc: "Classes & attendance", icon: "faculty" },
+  { title: "Admin Portal", role: "Administrator", desc: "System management", icon: "admin" }
 ];
+
+function PortalIcon({ icon }: { icon: Portal["icon"] }) {
+  if (icon === "student") return <Users size={24} />;
+  if (icon === "faculty") return <GraduationCap size={24} />;
+  return <ShieldCheck size={24} />;
+}
 
 export default function Home() {
   return (
@@ -64,14 +77,14 @@ export default function Home() {
           Sign in with your ASRS account. Your role automatically determines the portal you can access.
         </p>
         <div className="features" style={{ padding: 0, gridTemplateColumns: "repeat(3,1fr)" }}>
-          {portals.map(([title, role, desc, href, Icon]) => (
-            <Link href={href as string} key={title as string} className="feature"
+          {portals.map((portal) => (
+            <Link href="/login" key={portal.title} className="feature"
               style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}>
-              <Icon size={24} />
-              <b style={{ marginTop: 14 }}>{title as string}</b>
-              <span>{desc as string}</span>
+              <PortalIcon icon={portal.icon} />
+              <b style={{ marginTop: 14 }}>{portal.title}</b>
+              <span>{portal.desc}</span>
               <span style={{ display: "inline-flex", marginTop: 18, color: "#9dc5ff", fontWeight: 700 }}>
-                Sign in as {role as string} <ArrowRight size={15} style={{ marginLeft: 6 }} />
+                Sign in as {portal.role} <ArrowRight size={15} style={{ marginLeft: 6 }} />
               </span>
             </Link>
           ))}
