@@ -13,12 +13,13 @@ type Portal = {
   role: string;
   desc: string;
   icon: "student" | "faculty" | "admin";
+  loginRole: "student" | "faculty" | "admin";
 };
 
 const portals: Portal[] = [
-  { title: "Student Portal", role: "Students", desc: "Attendance, marks & profile", icon: "student" },
-  { title: "Faculty Portal", role: "Faculty", desc: "Classes & attendance", icon: "faculty" },
-  { title: "Admin Portal", role: "Administrator", desc: "System management", icon: "admin" }
+  { title: "Student Portal", role: "Students", desc: "Attendance, marks & profile", icon: "student", loginRole: "student" },
+  { title: "Faculty Portal", role: "Faculty", desc: "Classes & attendance", icon: "faculty", loginRole: "faculty" },
+  { title: "Admin Portal", role: "Administrator", desc: "System management", icon: "admin", loginRole: "admin" }
 ];
 
 function PortalIcon({ icon }: { icon: Portal["icon"] }) {
@@ -92,7 +93,7 @@ export default function Home() {
         </p>
         <div className="features" style={{ padding: 0, gridTemplateColumns: "repeat(3,1fr)" }}>
           {portals.map((portal) => (
-            <Link href="/login" key={portal.title} className="feature"
+            <Link href={"/login?role=" + portal.loginRole} key={portal.title} className="feature"
               style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }}>
               <PortalIcon icon={portal.icon} />
               <b style={{ marginTop: 14 }}>{portal.title}</b>
