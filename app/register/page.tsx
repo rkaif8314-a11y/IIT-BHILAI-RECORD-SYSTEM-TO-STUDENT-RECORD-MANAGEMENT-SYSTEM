@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 
 function codeOf(error: unknown) {
@@ -12,12 +12,20 @@ function codeOf(error: unknown) {
     : "";
 }
 
-function firebaseMessage(code: string, fallback: string) {
+function messageFor(error: unknown) {
+  const code = codeOf(error);
+  if (code.includes("auth/email-already-in-use")) {
+    return "This email already has a Firebase account. Go to Sign in and use that account. A new Firebase account cannot be created with the same email.";
+  }
+  if (code.includes("auth/invalid-api-key")) return "Firebase configuration is invalid.";
+  if (code.includes("auth/operation-not-allowed")) return "Email/password authentication is disabled in Firebase Authentication.";
   if (code.includes("auth/weak-password")) return "Password must contain at least 6 characters.";
   if (code.includes("auth/invalid-email")) return "Please enter a valid email address.";
-  if (code.includes("auth/operation-not-allowed")) return "Email/password sign-in is not enabled in Firebase.";
-  if (code.includes("permission-denied")) return "Firebase denied the profile write. Check Firestore rules.";
-  return fallback;
+  if (code.includes("permission-denied") || code.includes("firestore/permission-denied")) {
+    return "Firebase Authentication succeeded, but Firestore rejected the profile write. Publish the ASRS Firestore rules, then try again.";
+  }
+  if (code.includes("unavailable")) return "Firestore is temporarily unavailable. Please try again.";
+  return error instanceof Error ? error.message : "Account creation failed.";
 }
 
 export default function Register() {
@@ -29,84 +37,45 @@ export default function Register() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function saveProfile(uid: string, cleanName: string, cleanRoll: string, cleanEmail: string) {
-    const db = getFirebaseDb();
-    const ref = doc(db, "profiles", uid);
-    const existing = await getDoc(ref);
-    const existingRole = existing.exists() ? existing.data().role : undefined;
-
-    await setDoc(ref, {
-      fullName: cleanName,
-      rollNo: cleanRoll,
-      department: dept,
-      email: cleanEmail,
-      ...(existingRole ? { role: existingRole } : { role: "student" }),
-      ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("");
+    if (busy) return;
 
     const cleanName = name.trim();
     const cleanRoll = roll.trim();
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanName || !cleanRoll || !cleanEmail || password.length < 6) {
-      setMessage("Please complete every field and use a password of at least 6 characters.");
+      setMessage("Complete all fields. Password must contain at least 6 characters.");
       return;
     }
 
     setBusy(true);
+    setMessage("Creating Firebase account and saving your student profile…");
 
     try {
-      const credential = await createUserWithEmailAndPassword(
-        getFirebaseAuth(),
-        cleanEmail,
-        password
-      );
+      const auth = getFirebaseAuth();
+      const db = getFirebaseDb();
 
-      await saveProfile(credential.user.uid, cleanName, cleanRoll, cleanEmail);
+      // One successful registration creates BOTH:
+      // 1. Firebase Authentication user
+      // 2. Firestore profiles/{uid} document
+      const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+
+      await setDoc(doc(db, "profiles", credential.user.uid), {
+        fullName: cleanName,
+        rollNo: cleanRoll,
+        department: dept,
+        email: cleanEmail,
+        role: "student",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setMessage("Account and Firestore profile created successfully. Opening Student Portal…");
       window.location.replace("/student");
     } catch (error) {
-      const code = codeOf(error);
-
-      // An existing Auth account can be repaired here when the password is
-      // correct. This also creates the missing Firestore profile document.
-      if (code.includes("auth/email-already-in-use")) {
-        try {
-          const credential = await signInWithEmailAndPassword(
-            getFirebaseAuth(),
-            cleanEmail,
-            password
-          );
-          await saveProfile(credential.user.uid, cleanName, cleanRoll, cleanEmail);
-          setMessage("Existing account connected to its ASRS profile. Opening your dashboard…");
-          window.setTimeout(() => window.location.replace("/student"), 300);
-          return;
-        } catch (repairError) {
-          const repairCode = codeOf(repairError);
-          setMessage(
-            repairCode.includes("invalid-credential") || repairCode.includes("wrong-password")
-              ? "This email already has an account. Use that account's password or sign in from the login page."
-              : firebaseMessage(
-                  repairCode,
-                  repairError instanceof Error ? repairError.message : "Could not connect the existing account."
-                )
-          );
-          setBusy(false);
-          return;
-        }
-      }
-
-      setMessage(
-        firebaseMessage(
-          code,
-          error instanceof Error ? error.message : "Could not create the account."
-        )
-      );
+      setMessage(messageFor(error));
       setBusy(false);
     }
   }
@@ -125,18 +94,35 @@ export default function Register() {
         <div className="auth-card">
           <span className="eyebrow">New student</span>
           <h1>Create account.</h1>
-          <p>Create your student login and personal ASRS profile. Your profile is saved in Firestore.</p>
+          <p>One registration creates your Firebase login and your student profile in the ASRS Firestore database.</p>
 
           <form onSubmit={submit}>
-            <label>Full name<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Your full name" required /></label>
-            <label>Roll number<input value={roll} onChange={(e) => setRoll(e.target.value)} placeholder="B25EE023" required /></label>
-            <label>Department<select value={dept} onChange={(e) => setDept(e.target.value)}><option>CSE</option><option>ECE</option><option>EE</option><option>ME</option><option>Other</option></select></label>
-            <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" required /></label>
-            <label>Password<input type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="At least 6 characters" required /></label>
-            <button type="submit" className="button primary wide" disabled={busy}>{busy ? "Connecting account…" : "Create account"}</button>
+            <label>Full name
+              <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Your full name" required />
+            </label>
+            <label>Roll number
+              <input value={roll} onChange={(e) => setRoll(e.target.value)} placeholder="B25EE023" required />
+            </label>
+            <label>Department
+              <select value={dept} onChange={(e) => setDept(e.target.value)}>
+                <option>CSE</option><option>ECE</option><option>EE</option><option>ME</option><option>Other</option>
+              </select>
+            </label>
+            <label>Email
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" required />
+            </label>
+            <label>Password
+              <input type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="At least 6 characters" required />
+            </label>
+            <button type="submit" className="button primary wide" disabled={busy}>
+              {busy ? "Creating account…" : "Create account"}
+            </button>
           </form>
 
           {message && <div className="status">{message}</div>}
+          <div className="auth-note">
+            Already registered? <Link href="/login">Sign in instead</Link>.
+          </div>
         </div>
       </section>
     </main>
