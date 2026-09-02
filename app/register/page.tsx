@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 
 function codeOf(error: unknown) {
@@ -30,12 +30,18 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
 
   async function saveProfile(uid: string, cleanName: string, cleanRoll: string, cleanEmail: string) {
-    await setDoc(doc(getFirebaseDb(), "profiles", uid), {
+    const db = getFirebaseDb();
+    const ref = doc(db, "profiles", uid);
+    const existing = await getDoc(ref);
+    const existingRole = existing.exists() ? existing.data().role : undefined;
+
+    await setDoc(ref, {
       fullName: cleanName,
       rollNo: cleanRoll,
       department: dept,
-      role: "student",
       email: cleanEmail,
+      ...(existingRole ? { role: existingRole } : { role: "student" }),
+      ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
       updatedAt: serverTimestamp(),
     }, { merge: true });
   }
@@ -67,8 +73,8 @@ export default function Register() {
     } catch (error) {
       const code = codeOf(error);
 
-      // If the Firebase Auth account already exists, authenticate with the
-      // supplied password and repair/create the missing Firestore profile.
+      // An existing Auth account can be repaired here when the password is
+      // correct. This also creates the missing Firestore profile document.
       if (code.includes("auth/email-already-in-use")) {
         try {
           const credential = await signInWithEmailAndPassword(
@@ -84,7 +90,7 @@ export default function Register() {
           const repairCode = codeOf(repairError);
           setMessage(
             repairCode.includes("invalid-credential") || repairCode.includes("wrong-password")
-              ? "This email already has an account. Use the password for that account or sign in from the login page."
+              ? "This email already has an account. Use that account's password or sign in from the login page."
               : firebaseMessage(
                   repairCode,
                   repairError instanceof Error ? repairError.message : "Could not connect the existing account."
