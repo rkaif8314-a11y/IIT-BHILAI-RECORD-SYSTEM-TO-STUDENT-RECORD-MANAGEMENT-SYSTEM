@@ -1,69 +1,14 @@
 "use client";
-
-import { useState } from "react";
-import { ShieldCheck, Users, GraduationCap, BookOpen, Settings } from "lucide-react";
-
-type Section = "Overview" | "Students" | "Faculty" | "Courses" | "Controls";
-
-const sections: Section[] = ["Overview", "Students", "Faculty", "Courses", "Controls"];
-
-function SectionIcon({ section }: { section: Section }) {
-  if (section === "Overview") return <ShieldCheck size={16} aria-hidden="true" />;
-  if (section === "Students") return <Users size={16} aria-hidden="true" />;
-  if (section === "Faculty") return <GraduationCap size={16} aria-hidden="true" />;
-  if (section === "Courses") return <BookOpen size={16} aria-hidden="true" />;
-  return <Settings size={16} aria-hidden="true" />;
-}
-
-export default function AdminPortal() {
-  const [section, setSection] = useState<Section>("Overview");
-
-  return (
-    <main className="page">
-      <nav className="nav">
-        <div className="brand">
-          <a href="/" style={{ color: "inherit", textDecoration: "none" }} aria-label="Back to ASRS">←</a>
-          <div className="logo">A</div>
-          <div>ASRS<small>Admin Portal</small></div>
-        </div>
-        <div className="navtag">Administrator • System Control</div>
-      </nav>
-
-      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "55px 6vw" }}>
-        <span className="eyebrow">Admin Portal</span>
-        <h1 style={{ fontSize: "clamp(38px,6vw,64px)", margin: "18px 0 10px", letterSpacing: "-.04em" }}>
-          Control the system.
-        </h1>
-        <p style={{ color: "#9db0c7", fontSize: 17 }}>
-          Manage academic entities and keep ASRS organized.
-        </p>
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
-          {sections.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setSection(item)}
-              className="button"
-              style={{ cursor: "pointer" }}
-              aria-pressed={section === item}
-            >
-              <SectionIcon section={item} /> {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="panel" style={{ marginTop: 18 }}>
-          <strong>{section}</strong>
-          <p style={{ color: "#9db0c7", lineHeight: 1.7 }}>
-            This ASRS administration area is ready for the production database and role-based authentication.
-          </p>
-        </div>
-
-        <div className="actions">
-          <a className="button" href="/">Back to ASRS</a>
-        </div>
-      </section>
-    </main>
-  );
+import {useEffect,useState} from "react";
+import {onAuthStateChanged,signOut} from "firebase/auth";
+import {addDoc,collection,getDocs,doc,getDoc,serverTimestamp} from "firebase/firestore";
+import {getFirebaseAuth,getFirebaseDb} from "@/lib/firebase";
+export default function AdminPortal(){
+ const [u,setU]=useState<any>(null),[profiles,setProfiles]=useState<any[]>([]),[courses,setCourses]=useState<any[]>([]),[code,setCode]=useState(""),[name,setName]=useState(""),[msg,setMsg]=useState(""),[tab,setTab]=useState("Overview");
+ async function load(){const db=getFirebaseDb();const p=await getDocs(collection(db,"profiles"));const c=await getDocs(collection(db,"courses"));setProfiles(p.docs.map(d=>({id:d.id,...d.data()})));setCourses(c.docs.map(d=>({id:d.id,...d.data()})))}
+ useEffect(()=>onAuthStateChanged(getFirebaseAuth(),async x=>{if(!x){location.replace("/login");return}const p=await getDoc(doc(getFirebaseDb(),"profiles",x.uid));if(!p.exists()||p.data().role!=="admin"){location.replace("/student");return}setU(x);load()}),[]);
+ async function createCourse(){if(!code||!name){setMsg("Enter course code and name.");return}try{await addDoc(collection(getFirebaseDb(),"courses"),{courseCode:code,courseName:name,createdAt:serverTimestamp()});setCode("");setName("");setMsg("Course created.");load()}catch(e){setMsg(e instanceof Error?e.message:"Create failed")}}
+ if(!u)return <main className="page"><div className="loading">Loading admin console…</div></main>;
+ const students=profiles.filter(x=>x.role==="student"),faculty=profiles.filter(x=>x.role==="faculty");
+ return <main className="page"><nav className="nav"><div className="brand"><div className="logo">A</div><div>ASRS<small>Admin Console</small></div></div><div className="nav-actions"><button className="button small" onClick={()=>signOut(getFirebaseAuth())}>Sign out</button></div></nav><section className="dashboard"><div className="dash-head"><div><span className="eyebrow">System control</span><h1>Administration.</h1><p>Live people and course data from Firestore.</p></div></div>{msg&&<div className="status">{msg}</div>}<div className="tabs">{["Overview","Students","Faculty","Courses"].map(x=><button className={"button "+(tab===x?"active":"")} onClick={()=>setTab(x)} key={x}>{x}</button>)}</div>{tab==="Overview"&&<div className="metric-grid"><div className="metric"><b>{students.length}</b><span>Students</span></div><div className="metric"><b>{faculty.length}</b><span>Faculty</span></div><div className="metric"><b>{courses.length}</b><span>Courses</span></div><div className="metric"><b>{profiles.filter(x=>x.role==="admin").length}</b><span>Admins</span></div></div>}{tab==="Courses"&&<div className="dashboard-grid"><section className="panel"><div className="section-title"><span>Create course</span><small>Saved to Firestore</small></div><label>Course code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="CSL100"/></label><label>Course name<input value={name} onChange={e=>setName(e.target.value)} placeholder="Computer Programming"/></label><button className="button primary wide" onClick={createCourse}>Create course</button></section><section className="panel"><div className="section-title"><span>Courses</span><small>{courses.length} total</small></div><div className="list">{courses.map(c=><div className="list-row" key={c.id}><div><b>{c.courseCode}</b><span>{c.courseName}</span></div></div>)}</div></section></div>}{(tab==="Students"||tab==="Faculty")&&<section className="panel"><div className="section-title"><span>{tab}</span><small>profiles collection</small></div><div className="list">{(tab==="Students"?students:faculty).map(x=><div className="list-row" key={x.id}><div><b>{x.fullName||"Unnamed"}</b><span>{x.rollNo||x.department||"No details"}</span></div><em>{x.role}</em></div>)}</div></section>}</section></main>
 }
