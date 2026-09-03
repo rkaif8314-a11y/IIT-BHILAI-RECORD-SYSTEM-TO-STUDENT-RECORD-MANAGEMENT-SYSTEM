@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const caller = await adminAuth.verifyIdToken(idToken);
 
     const callerProfile = await adminDb.collection("profiles").doc(caller.uid).get();
-    if (!callerProfile.exists || callerProfile.data()?.role !== "admin") {
+    const callerRole = callerProfile.exists && typeof callerProfile.data()?.role === "string"\n      ? callerProfile.data()?.role.trim().toLowerCase()\n      : "";\n    if (!callerProfile.exists || callerRole !== "admin") {
       return fail("Only an authorized ASRS administrator can provision accounts.", 403);
     }
 
