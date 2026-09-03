@@ -43,7 +43,7 @@ export default function AdminPortal() {
       getDocs(collection(db, "profiles")),
       getDocs(collection(db, "courses")),
     ]);
-    setProfiles(profileSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Profile)));
+    setProfiles(profileSnap.docs.map((d) => {\n      const data = d.data();\n      return {\n        id: d.id,\n        ...data,\n        role: typeof data.role === "string" ? data.role.trim().toLowerCase() : data.role,\n      } as Profile;\n    }));
     setCourses(courseSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Course)));
   }
 
