@@ -55,7 +55,7 @@ export default function AdminPortal() {
       }
       try {
         const profile = await getDoc(doc(getFirebaseDb(), "profiles", currentUser.uid));
-        if (!profile.exists() || profile.data().role !== "admin") {
+        const profileRole = profile.exists() && typeof profile.data().role === "string"\n          ? profile.data().role.trim().toLowerCase()\n          : "";\n        if (!profile.exists() || profileRole !== "admin") {
           window.location.replace("/login");
           return;
         }
