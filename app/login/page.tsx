@@ -45,7 +45,7 @@ export default function Login() {
     }
 
     const profile = snap.data() || {};
-    const actualRole = profile.role;
+    // Normalize role values so legacy records such as "Admin" still work.\n    const actualRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : "";
 
     if (!["student", "faculty", "admin"].includes(actualRole)) {
       setMessage("Your ASRS account does not have a valid role. Ask an administrator to provision it.");
