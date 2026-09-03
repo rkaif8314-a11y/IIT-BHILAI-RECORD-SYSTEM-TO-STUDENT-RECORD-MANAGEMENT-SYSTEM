@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isStaff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && (
+          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "admin"
+          || get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "faculty"
+        );
+    }
+
+    match /profiles/{uid} {
+      // Self-registration is strictly STUDENT-only.
+      // Faculty/admin profiles are created by the secure server provisioning API.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == "student";
+
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      // A student cannot promote/change their role.
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && resource.data.role == "student"
+          && request.resource.data.role == "student"
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /courses/{id} {
+      allow read: if signedIn();
+      allow write: if isStaff();
+    }
+
+    match /enrollments/{id} {
+      allow read: if signedIn();
+      allow write: if isStaff();
+    }
+
+    match /attendanceSessions/{id} {
+      allow read: if signedIn();
+      allow write: if isStaff();
+    }
+
+    match /attendanceRecords/{id} {
+      allow read: if signedIn()
+        && (
+          resource.data.studentId == request.auth.uid
+          || isStaff()
+        );
+      allow write: if isStaff();
+    }
+
+    match /marks/{id} {
+      allow read: if signedIn()
+        && (
+          resource.data.studentId == request.auth.uid
+          || isStaff()
+        );
+      allow write: if isStaff();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
