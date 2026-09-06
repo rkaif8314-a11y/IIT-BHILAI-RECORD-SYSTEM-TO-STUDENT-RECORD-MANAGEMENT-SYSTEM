@@ -48,7 +48,10 @@ service cloud.firestore {
     }
 
     match /enrollments/{id} {
-      allow read: if signedIn();
+      // Enrollment records contain student-specific data; students can only
+      // read their own record while staff can manage/read all records.
+      allow read: if isStaff()
+        || (signedIn() && resource.data.studentId == request.auth.uid);
       allow write: if isStaff();
     }
 
