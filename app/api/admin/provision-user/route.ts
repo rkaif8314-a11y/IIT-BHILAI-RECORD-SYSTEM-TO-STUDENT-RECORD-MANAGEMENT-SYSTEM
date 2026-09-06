@@ -15,7 +15,10 @@ type ProvisionBody = {
 };
 
 function fail(message: string, status = 400) {
-  return NextResponse.json({ ok: false, message }, { status });
+  return NextResponse.json(
+    { ok: false, message },
+    { status, headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -24,12 +27,17 @@ export async function POST(request: NextRequest) {
     if (!authorization?.startsWith("Bearer ")) return fail("Authentication required.", 401);
 
     const idToken = authorization.slice("Bearer ".length).trim();
+    if (!idToken) return fail("Authentication required.", 401);
+
     const adminAuth = getAdminAuth();
     const adminDb = getAdminDb();
-    const caller = await adminAuth.verifyIdToken(idToken);
+    const caller = await adminAuth.verifyIdToken(idToken, true);
 
     const callerProfile = await adminDb.collection("profiles").doc(caller.uid).get();
-    const callerRole = callerProfile.exists && typeof callerProfile.data()?.role === "string"\n      ? callerProfile.data()?.role.trim().toLowerCase()\n      : "";\n    if (!callerProfile.exists || callerRole !== "admin") {
+    const callerRole = callerProfile.exists && typeof callerProfile.data()?.role === "string"
+      ? callerProfile.data()?.role.trim().toLowerCase()
+      : "";
+    if (!callerProfile.exists || callerRole !== "admin") {
       return fail("Only an authorized ASRS administrator can provision accounts.", 403);
     }
 
@@ -44,10 +52,18 @@ export async function POST(request: NextRequest) {
     if (!fullName || !email || !password || !department || !employeeId) {
       return fail("Name, email, password, department and employee ID are required.");
     }
+    if (fullName.length > 120 || email.length > 254 || department.length > 120 || employeeId.length > 80) {
+      return fail("One or more fields are too long.");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return fail("Enter a valid email address.");
+    }
     if (role !== "faculty" && role !== "admin") {
       return fail("Only Faculty or Administrator accounts can be provisioned here.");
     }
-    if (password.length < 6) return fail("Temporary password must be at least 6 characters.");
+    if (password.length < 6 || password.length > 128) {
+      return fail("Temporary password must be between 6 and 128 characters.");
+    }
 
     const existingProfile = await adminDb.collection("profiles")
       .where("email", "==", email).limit(1).get();
@@ -64,11 +80,15 @@ export async function POST(request: NextRequest) {
         createdBy: caller.uid, createdAt: FieldValue.serverTimestamp(),
       });
 
-      return NextResponse.json({
-        ok: true,
-        message: role === "faculty" ? "Faculty account created successfully." : "Administrator account created successfully.",
-        uid: createdUser.uid, email, role,
-      });
+      return NextResponse.json(
+        {
+          ok: true,
+          message: role === "faculty" ? "Faculty account created successfully." : "Administrator account created successfully.",
+          email,
+          role,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     } catch (error) {
       if (createdUser?.uid) {
         try { await adminAuth.deleteUser(createdUser.uid); } catch {}
@@ -79,8 +99,13 @@ export async function POST(request: NextRequest) {
     const code = error && typeof error === "object" && "code" in error
       ? String((error as { code: string }).code) : "";
 
-    if (code.includes("auth/id-token-expired") || code.includes("auth/argument-error")) {
-      return fail("Your admin session expired. Sign in again.", 401);
+    if (
+      code.includes("auth/id-token-expired") ||
+      code.includes("auth/argument-error") ||
+      code.includes("auth/id-token-revoked") ||
+      code.includes("auth/invalid-id-token")
+    ) {
+      return fail("Your admin session is invalid or expired. Sign in again.", 401);
     }
     if (code.includes("auth/email-already-exists")) {
       return fail("This email already has a Firebase Authentication account.", 409);
