@@ -43,7 +43,14 @@ export default function AdminPortal() {
       getDocs(collection(db, "profiles")),
       getDocs(collection(db, "courses")),
     ]);
-    setProfiles(profileSnap.docs.map((d) => {\n      const data = d.data();\n      return {\n        id: d.id,\n        ...data,\n        role: typeof data.role === "string" ? data.role.trim().toLowerCase() : data.role,\n      } as Profile;\n    }));
+    setProfiles(profileSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        role: typeof data.role === "string" ? data.role.trim().toLowerCase() : data.role,
+      } as Profile;
+    }));
     setCourses(courseSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Course)));
   }
 
@@ -55,7 +62,10 @@ export default function AdminPortal() {
       }
       try {
         const profile = await getDoc(doc(getFirebaseDb(), "profiles", currentUser.uid));
-        const profileRole = profile.exists() && typeof profile.data().role === "string"\n          ? profile.data().role.trim().toLowerCase()\n          : "";\n        if (!profile.exists() || profileRole !== "admin") {
+        const profileRole = profile.exists() && typeof profile.data().role === "string"
+          ? profile.data().role.trim().toLowerCase()
+          : "";
+        if (!profile.exists() || profileRole !== "admin") {
           window.location.replace("/login");
           return;
         }
