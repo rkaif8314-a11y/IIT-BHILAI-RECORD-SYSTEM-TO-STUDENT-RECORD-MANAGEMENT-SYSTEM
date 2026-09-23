@@ -27,3 +27,8 @@ Import this repository into Vercel, set the six NEXT_PUBLIC_FIREBASE_* environme
 ## Data Model
 
 The core records map students to courses and academic activity. Profiles identify roles, enrollments connect students to courses, attendance sessions represent scheduled class events, attendance records capture participation, and marks store academic results. Access rules should ensure users can read or modify only the records permitted by their role and ownership.
+
+
+## Deployment Verification
+
+After deployment, verify authentication, role-based routing, Firestore access, and the main student/faculty/admin flows. Confirm all required Firebase environment variables are present, Firestore rules are deployed, and the production build completes successfully. Test both authorized and unauthorized paths before treating a deployment as ready.
