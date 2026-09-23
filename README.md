@@ -23,3 +23,7 @@ profiles, courses, enrollments, attendanceSessions, attendanceRecords, marks
 
 ## Vercel
 Import this repository into Vercel, set the six NEXT_PUBLIC_FIREBASE_* environment variables, and deploy the asrs-production branch.
+
+## Data Model
+
+The core records map students to courses and academic activity. Profiles identify roles, enrollments connect students to courses, attendance sessions represent scheduled class events, attendance records capture participation, and marks store academic results. Access rules should ensure users can read or modify only the records permitted by their role and ownership.
