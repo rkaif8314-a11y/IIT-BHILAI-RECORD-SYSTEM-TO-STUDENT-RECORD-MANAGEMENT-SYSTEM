@@ -32,3 +32,15 @@ The core records map students to courses and academic activity. Profiles identif
 ## Deployment Verification
 
 After deployment, verify authentication, role-based routing, Firestore access, and the main student/faculty/admin flows. Confirm all required Firebase environment variables are present, Firestore rules are deployed, and the production build completes successfully. Test both authorized and unauthorized paths before treating a deployment as ready.
+
+## Local verification
+
+Run the same checks used by CI before deployment:
+
+```bash
+npm install
+npm run typecheck
+npm run build
+```
+
+For data-layer changes, also verify the relevant Firestore rules and test both an authorized path and an unauthorized path.
